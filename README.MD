@@ -72,27 +72,32 @@ The formula base on HP loss, level and ship type is already proved, while this v
 - In the docking time formula, a 30-second bias is always added; the docking is actually finished, however, 1 minute earlier. And anchorage repair time will be **rounded up** to next minute.
 
 ### Timer reset rules
-The plugin approximates game-side timers from Kancolle API response events and
-the already-updated local store state. The references describe in-game screen
-behavior, so implementation is based on the closest observable API transitions.
+Both shared timers always exist on the server, but they are not sent directly in
+API traffic. The plugin therefore calibrates them from observable API responses
+and the already-updated local store state, and persists the latest timestamps in
+local storage to survive plugin restarts.
 
-- **Repair timer (global/shared)**:
-  - Starts when a repair ship becomes flagship and the fleet can perform anchorage repair.
-  - Advances after a port update if at least 20 minutes have elapsed and repair is active.
-  - Resets when the fleet whose flagship is a repair ship changes composition.
-  - Also resets when a ship is moved from a repair-ship fleet into another fleet.
-  - Fleet preset loading does **not** reset the timer.
-  - Sending a fleet containing a repair ship to expedition resets the shared timer if another repair fleet remains active; otherwise the plugin clears the timer until repair becomes active again.
-  - Expedition return itself does not reset the timer.
-  - Sortie, exercise, equipment changes, development, and other-fleet operations do not reset the timer.
+- The plugin only treats `'/kcsapi/api_port/port'` and `'/kcsapi/api_req_hensei/change'` as timer-reset related events.
 
-- **Nosaki timer (global/shared)**:
-  - Starts when Nosaki/Nosaki Kai is in position 1 or 2.
-  - At port return after 15 minutes, morale boost is applied if Nosaki and target ships satisfy the eligibility checks.
-  - Resets when a fleet with Nosaki/Nosaki Kai in position 1 or 2 changes composition.
-  - Fleet preset loading and companion fleet-wide disband do **not** reset the timer.
-  - The timer is shared even when multiple fleets operate Nosaki.
-  - Sortie and exercise do not reset the timer. Expedition and docking are eligibility checks for applying the effect.
+- **`port` event**:
+  - If a timer is not initialized yet, restore it from persisted local data when available; otherwise start from the current timestamp.
+  - If the elapsed time has reached the configured interval (20 minutes for repair / 15 minutes for Nosaki), reset the corresponding shared timer.
+  - Whether any fleet can currently receive the effect only changes effect application, not timer progression itself.
+
+- **`change` event**:
+  - `api_ship_id === -2` (`随伴艦一括解除`, fleet-wide companion removal) does not reset either timer.
+  - After the composition change, reset the shared timer if any affected fleet satisfies the timer condition:
+    - HP repair: a repair ship is flagship
+    - Morale boost: Nosaki / Nosaki Kai is in slot 1 or 2
+
+- **Other events**:
+  - Expedition departure / return, sortie, exercise, remodeling, docking, equipment changes, and similar events do not reset timers.
+  - Those factors only affect whether the effect can be applied at that moment.
+
+### Expedition-related tests
+- Verified with both Akashi-side and Nosaki-side behavior: expedition departure and expedition return do not reset the shared timers.
+- A fleet that is still on expedition does not receive anchorage repair / morale boost on the `port` settlement that follows expedition result collection, even if the timer has already expired.
+- Using fleet save / restore to pick up Nosaki morale boosts between sorties has been stable in regular use.
 
 ### Timer Behavior (Important!)
 - **Both timers are global/shared**: Per WIKI, both repair timer and Nosaki timer are shared across fleets.
@@ -105,14 +110,14 @@ behavior, so implementation is based on the closest observable API transitions.
 ### Corner cases
 Following corner cases are not taken into consideration, thus the result may not behave as it could be.
 - changing Akashi's slot items, more precisely, changing the numbers of Ship Repair Facilities (for Akashi),
-- exact server-side behavior for rare edge cases not directly visible from API response timing.
+- the timer being advanced from another client before this plugin receives an event that can re-calibrate it.
 
 ### Implemented Features
-✓ Fleet preset loading doesn't reset timers
-✓ Nosaki timer is global across all fleets
-✓ Cross-fleet ship swaps reset affected repair/Nosaki timers when appropriate
-✓ Expedition departure resets or clears the repair timer depending on whether another repair fleet remains active
-✓ Ship remodeling (including Nosaki → Nosaki Kai) doesn't reset timer
+✓ Timer timestamps are persisted in local storage
+✓ Both timers are shared globally across fleets
+✓ Timers only advance / reset on `port` and `change` according to the observed rules
+✓ Cross-fleet ship swaps check all affected fleets and reset shared timers when conditions are met
+✓ Expedition departure / return, fleet presets, and ship remodeling do not reset timers
 
 # Changelog
 ## v0.1
