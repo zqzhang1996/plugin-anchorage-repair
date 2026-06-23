@@ -6,30 +6,11 @@
  */
 
 type TimerStateListener = () => void
-type PersistedTimerState = {
-  lastNosakiRefresh: number
-  lastRepairRefresh: number
-}
-
-const TIMER_STATE_STORAGE_KEY = 'poi-plugin-anchorage-repair:timer-state'
-const DEFAULT_TIMER_STATE: PersistedTimerState = {
-  lastNosakiRefresh: 0,
-  lastRepairRefresh: 0,
-}
-
-const normalizeTimestamp = (value: unknown): number =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
 
 class TimerStateManager {
   private lastNosakiRefresh: number = 0
   private lastRepairRefresh: number = 0 // Global repair timer (Akashi/Asahi Kai)
   private listeners: Set<TimerStateListener> = new Set()
-
-  constructor() {
-    const persistedState = this.loadPersistedState()
-    this.lastNosakiRefresh = persistedState.lastNosakiRefresh
-    this.lastRepairRefresh = persistedState.lastRepairRefresh
-  }
 
   getLastNosakiRefresh(): number {
     return this.lastNosakiRefresh
@@ -37,7 +18,6 @@ class TimerStateManager {
 
   setLastNosakiRefresh(timestamp: number): void {
     this.lastNosakiRefresh = timestamp
-    this.persistState()
     this.notifyListeners()
   }
 
@@ -48,7 +28,6 @@ class TimerStateManager {
 
   clearNosakiTimer(): void {
     this.lastNosakiRefresh = 0
-    this.persistState()
     this.notifyListeners()
   }
 
@@ -59,7 +38,6 @@ class TimerStateManager {
 
   setLastRepairRefresh(timestamp: number): void {
     this.lastRepairRefresh = timestamp
-    this.persistState()
     this.notifyListeners()
   }
 
@@ -70,7 +48,6 @@ class TimerStateManager {
 
   clearRepairTimer(): void {
     this.lastRepairRefresh = 0
-    this.persistState()
     this.notifyListeners()
   }
 
@@ -83,43 +60,6 @@ class TimerStateManager {
 
   private notifyListeners(): void {
     this.listeners.forEach((listener) => listener())
-  }
-
-  private loadPersistedState(): PersistedTimerState {
-    if (typeof window === 'undefined') {
-      return DEFAULT_TIMER_STATE
-    }
-
-    try {
-      const rawValue = window.localStorage.getItem(TIMER_STATE_STORAGE_KEY)
-      if (!rawValue) return DEFAULT_TIMER_STATE
-
-      const parsedValue = JSON.parse(rawValue) as Partial<PersistedTimerState>
-      return {
-        lastNosakiRefresh: normalizeTimestamp(parsedValue.lastNosakiRefresh),
-        lastRepairRefresh: normalizeTimestamp(parsedValue.lastRepairRefresh),
-      }
-    } catch {
-      return DEFAULT_TIMER_STATE
-    }
-  }
-
-  private persistState(): void {
-    if (typeof window === 'undefined') {
-      return
-    }
-
-    try {
-      window.localStorage.setItem(
-        TIMER_STATE_STORAGE_KEY,
-        JSON.stringify({
-          lastNosakiRefresh: this.lastNosakiRefresh,
-          lastRepairRefresh: this.lastRepairRefresh,
-        }),
-      )
-    } catch {
-      // Ignore persistence failures and keep the in-memory timers working.
-    }
   }
 }
 
