@@ -85,6 +85,9 @@ type GameStateSnapshot = {
   repairId: number[]
 }
 
+// api_ship_id value that represents 随伴艦一括解除 (fleet-wide companion removal)
+const FLEET_COMPANION_REMOVAL_ID = -2
+
 const hasRepairShipFlagship = (
   fleet: APIDeckPort,
   ships: Record<number, APIShip>,
@@ -93,11 +96,13 @@ const hasRepairShipFlagship = (
   return shipId > 0 && REPAIR_SHIP_ID.includes(ships[shipId]?.api_ship_id)
 }
 
+const NOSAKI_ELIGIBLE_POSITIONS = [0, 1] // flagship and second position
+
 const hasNosakiInFirstTwo = (
   fleet: APIDeckPort,
   ships: Record<number, APIShip>,
 ): boolean =>
-  [0, 1].some((idx) => {
+  NOSAKI_ELIGIBLE_POSITIONS.some((idx) => {
     const shipId = fleet.api_ship[idx]
     return shipId > 0 && NOSAKI_ID_LIST.includes(ships[shipId]?.api_ship_id)
   })
@@ -165,7 +170,7 @@ const PluginAnchorageRepair: React.FC = () => {
         const changedShipId = parseInt(body.api_ship_id, 10)
         const changedFleetId = parseInt(body.api_id, 10)
 
-        if (changedShipId === -2) break
+        if (changedShipId === FLEET_COMPANION_REMOVAL_ID) break
 
         const changedFleetId2 = previousFleets.find((fleet) =>
           fleet.api_ship.some((id) => id === changedShipId),
@@ -216,7 +221,7 @@ const PluginAnchorageRepair: React.FC = () => {
         const changedShipId = parseInt(body.api_ship_id, 10)
         const changedFleetId = parseInt(body.api_id, 10)
 
-        if (changedShipId === -2) break
+        if (changedShipId === FLEET_COMPANION_REMOVAL_ID) break
 
         const changedFleetId2 = previousFleets.find((fleet) =>
           fleet.api_ship.some((id) => id === changedShipId),
