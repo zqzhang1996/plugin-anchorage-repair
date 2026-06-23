@@ -25,10 +25,8 @@ import {
 } from './fleet-selectors'
 import {
   checkRepairActive,
-  checkNosakiPresent,
   REPAIR_SHIP_ID,
   NOSAKI_ID_LIST,
-  getFleetStatus,
 } from './fleet-utils'
 import { akashiEstimate, AKASHI_INTERVAL, NOSAKI_INTERVAL } from './functions'
 import { timerState } from './timer-state'
@@ -195,7 +193,7 @@ const PluginAnchorageRepair: React.FC = () => {
   const handleNosakiTimerEvents = useCallback((e: Event) => {
     const event = e as GameResponseEvent
     const { path, postBody } = event.detail
-    const { fleets, ships, $ships, repairId, equips } = getGameState()
+    const { fleets, ships } = getGameState()
     const previousFleets = previousRepairGameStateRef.current?.fleets ?? fleets
 
     const currentTime = Date.now()
